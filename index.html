@@ -1,85 +1,206 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>PDF 预览</title>
-  <style>
-    #pdf-container {
-      width: 100%;
-      height: 100vh;
-    }
-    .pdf-mobile-warning {
-      display: none;
-      padding: 15px;
-      background: #ffeb3b;
-      text-align: center;
-    }
-    @media (max-width: 768px) {
-      .pdf-mobile-warning { display: block; }
-    }
-  </style>
+    <title>我的PDF预览</title>
+    <style>
+        /* 页面样式 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        /* PDF预览容器 */
+        #pdf-viewer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        /* PDF显示区域 */
+        #pdf-container {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #e0e0e0;
+            overflow: auto;
+            margin-bottom: 20px;
+        }
+        
+        /* 加载状态提示 */
+        #loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 10px 20px;
+            background: #0366d6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 5px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #0350a1;
+        }
+        
+        .secondary-btn {
+            background: #6c757d;
+        }
+        
+        .secondary-btn:hover {
+            background: #5a6268;
+        }
+        
+        /* 页面导航 */
+        .page-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
-  <div class="pdf-mobile-warning">
-    移动端体验可能受限，建议在电脑端查看完整效果
-  </div>
-  <div id="pdf-container"></div>
-  
-  <script src="lib/pdfjs/build/pdf.js"></script>
-  <script>
-    // 中国大陆CDN备用源
-    const PDFJS_CDN = [
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js',
-      'lib/pdfjs/build/pdf.js' // 本地备用
-    ];
+    <div id="pdf-viewer">
+        <h1>我的PDF预览</h1>
+        
+        <div class="page-nav">
+            <button id="prev-page" class="btn secondary-btn">上一页</button>
+            <span>页码: <span id="page_num"></span> / <span id="page_count"></span></span>
+            <button id="next-page" class="btn">下一页</button>
+        </div>
+        
+        <div id="pdf-container">
+            <div id="loading">正在加载PDF文件...</div>
+        </div>
+        
+        <button id="download-btn" class="btn">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 5px; vertical-align: middle;">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+            </svg>
+            下载PDF
+        </button>
+    </div>
     
-    // 智能加载PDF.js
-    function loadScript(url) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = url;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    }
+    <!-- PDF.js库 - 我们使用国内镜像确保速度 -->
+    <script src="https://cdn.staticfile.org/pdf.js/4.2.67/pdf.min.js"></script>
+    <script src="https://cdn.staticfile.org/pdf.js/4.2.67/pdf.worker.min.js"></script>
     
-    // 尝试从CDN加载，失败则使用本地
-    loadScript(PDFJS_CDN[0]).catch(() => loadScript(PDFJS_CDN[1])).then(initPDFViewer);
-    
-    function initPDFViewer() {
-      const pdfPath = 'resume.pdf';
-      const container = document.getElementById('pdf-container');
-      
-      // 添加时间戳避免缓存问题
-      const url = `${pdfPath}?t=${Date.now()}`;
-      
-      pdfjsLib.getDocument(url).promise.then(pdf => {
-        for (let i = 1; i <= pdf.numPages; i++) {
-          pdf.getPage(i).then(page => {
-            const canvas = document.createElement('canvas');
-            container.appendChild(canvas);
-            
-            const viewport = page.getViewport({ scale: 1.5 });
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            
-            page.render({
-              canvasContext: canvas.getContext('2d'),
-              viewport: viewport
+    <script>
+        // 获取PDF文件路径
+        const pdfPath = 'resume.pdf';  // 更改为你的PDF文件名
+        
+        // PDF.js设置
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.staticfile.org/pdf.js/4.2.67/pdf.worker.min.js';
+        
+        // 设置缩放比例
+        const scale = 1.5;
+        let currentPage = 1;
+        let pdfDoc = null;
+        
+        // 1. 加载PDF
+        (function loadPdf() {
+            // 尝试从国内镜像加载PDF
+            pdfjsLib.getDocument({
+                url: pdfPath,
+                cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/cmaps/',
+                cMapPacked: true
+            })
+            .promise.then(pdf => {
+                document.getElementById('loading').style.display = 'none';
+                pdfDoc = pdf;
+                
+                // 初始化页码显示
+                document.getElementById('page_count').textContent = pdfDoc.numPages;
+                
+                // 渲染第一页
+                renderPage(currentPage);
+            })
+            .catch(error => {
+                console.error('PDF加载失败:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #d9534f; padding: 20px;">
+                        <h3>PDF加载失败</h3>
+                        <p>${error.message}</p>
+                        <button onclick="location.reload()" class="btn">重新加载</button>
+                    </div>
+                `;
+                
+                // 如果加载失败，尝试直接下载链接
+                setTimeout(function() {
+                    const loadingDiv = document.getElementById('loading');
+                    loadingDiv.innerHTML += `<p><a href="${pdfPath}" download>点击此处尝试下载PDF文件</a></p>`;
+                }, 1000);
             });
-          });
+        })();
+        
+        // 2. 渲染PDF页面
+        function renderPage(pageNum) {
+            // 更新页码状态
+            currentPage = pageNum;
+            document.getElementById('page_num').textContent = pageNum;
+            
+            // 显示加载中状态
+            const canvasContainer = document.getElementById('pdf-container');
+            canvasContainer.innerHTML = '<div id="loading">正在加载第' + pageNum + '页...</div>';
+            
+            // 获取页面
+            pdfDoc.getPage(pageNum).then(page => {
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                canvas.id = 'pdf-canvas';
+                const ctx = canvas.getContext('2d');
+                
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                canvasContainer.innerHTML = '';
+                canvasContainer.appendChild(canvas);
+                
+                // 渲染页面内容
+                page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                });
+            });
         }
-      }).catch(error => {
-        container.innerHTML = `
-          <div style="text-align:center; padding:50px;">
-            <h2>PDF加载失败</h2>
-            <p>${error.message}</p>
-            <a href="${pdfPath}" download>点击下载PDF文件</a>
-          </div>
-        `;
-      });
-    }
-  </script>
+        
+        // 3. 设置事件监听器
+        document.getElementById('prev-page').addEventListener('click', function() {
+            if (currentPage <= 1) return;
+            renderPage(currentPage - 1);
+        });
+        
+        document.getElementById('next-page').addEventListener('click', function() {
+            if (currentPage >= pdfDoc.numPages) return;
+            renderPage(currentPage + 1);
+        });
+        
+        document.getElementById('download-btn').addEventListener('click', function() {
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.href = pdfPath;
+            link.download = pdfPath.split('/').pop();
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
 </body>
 </html>
