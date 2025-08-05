@@ -1,0 +1,4 @@
+mkdir -p lib/pdfjs
+cd lib/pdfjs
+wget https://github.com/mozilla/pdf.js/releases/download/v4.2.67/pdfjs-4.2.67-dist.zip
+unzip pdfjs-4.2.67-dist.zip
